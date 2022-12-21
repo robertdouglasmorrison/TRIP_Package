@@ -1,4 +1,4 @@
- # mutantAligner.R -- turn TRIP Screen Mutant Strain NGS data into relative abundance data to model growth defects
+# mutantAligner.R -- turn TRIP Screen Mutant Strain NGS data into relative abundance data to model growth defects
 
 # most recent updates:  Sept 2019 - package up as stand alone scripts to post to ISB's TB resource
 #			May 2022  - version for Magda's RIF data
@@ -721,11 +721,22 @@ writeResultTables <- function( tbl, samples, results.path, nExpectedGenes, poolG
 	write.table( expect, expectfile, sep="\t", quote=F, row.names=F)
 
 	# lastly, make a table with all meta data and all genes for modeling etc.
-	completeGeneTbl <- read.delim( CompleteGeneFile, as.is=T)
-	completeGenes <- sort( unique( completeGeneTbl$GeneID))
+	# there is potential for confusion here, about what genes to include in the model, if the
+	# samples had 2+ different mutant pool sources.
+	# Try to use the file mentioned in the sample key, as long as they are all the same.
+	# If 2+, use the globally defined one, with a warning
+	myPoolNames <- sort( unique( samples$MutantPool))
+	if ( length(myPoolNames) > 1) {
+		completeGeneTbl <- read.delim( CompleteGeneFile, as.is=T)
+		completeGenes <- sort( unique( completeGeneTbl$GeneID))
+		cat( "\n  Warning: Found 2+ mutant pool names, using: ", CompleteGeneFile, "\n  to define the universe of genes for modeling.\n")
+	} else {
+		completeGenes <- getMutantPoolGenes( myPoolNames)
+	}
 	outCounts <- matrix( NA, nrow=ncol(expectRPMlog2), ncol=length(completeGenes))
 	colnames(outCounts) <- completeGenes
 	rownames(outCounts) <- samples$SampleID
+
 	# first the log2 RPMHEG counts
 	where <- match( rownames(expectRPMlog2), completeGenes)
 	if ( any( is.na(where))) {
@@ -1418,7 +1429,7 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 		# allow a common shared set of Day Zero uninduced measrurements to be shared
 		commonDayZeroUNDrows <- vector()
 		if ( ! is.null( sharedDayZeroUninduced)) {
-			# first place to check is SubClass1
+			# first & only place to check is SubClass1
 			if ( any (tbl$SubClass1 == sharedDayZeroUninduced)) {
 				commonDayZeroUNDrows <- which( tbl$Day %in% DAY_ZERO & tbl$SubClass1 == sharedDayZeroUninduced)
 			}
