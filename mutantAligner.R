@@ -1020,7 +1020,7 @@ createResultsFolder <- function( sampleKeyFile, create=TRUE) {
 getMutantPoolGenes <- function( myPool) {
 
 	poolFile <- paste( "TRIP", myPool, "Primers.txt", sep=".")
-	poolFile <- file.path( "./CustomMutantGenome", poolFile)
+	poolFile <- file.path( TRIP.PATH, "CustomMutantGenome", poolFile)
 	if ( ! file.exists( poolFile)) stop( paste( "Failed to find Mutant Pool Primers file: ", poolFile))
 	poolTable <- read.delim( poolFile, as.is=T)
 	if ( ! ("GeneID" %in% colnames(poolTable))) stop( "Mutant Pool Primer file must have a 'GeneID' column")
