@@ -10,6 +10,9 @@
 #			Dec 2022  - adjust paths to let these scripts be called from any user path
 
 
+# if not done already by a caller, define the path to the TRIP_Screen installion 
+if ( ! exists( "TRIP.PATH")) TRIP.PATH <- "~/TRIP_Screen"	# set this as needed 
+
 library( DuffyNGS)
 require( Biostrings)
 multicore.setup(1)	# for debugging, only use 1 core.  Once stable, up it as wanted
@@ -20,8 +23,7 @@ setCurrentSpecies( "MT_H37")
 BOWTIE2_PROGRAM <- Sys.which( "bowtie2")
 if ( ! nchar( BOWTIE2_PROGRAM)) stop( "Unable to find 'bowtie2' on the search path")
 
-# the genones and target indexes, and the set of mutants
-TRIP.PATH <- "~/TRIP_Screen"	# set this as needed 
+# locations of the genones and target indexes, and the set of mutants
 TRIP.BowtieIndex <- file.path( TRIP.PATH, "BowtieIndexes/MTb.TRIP.MutantGenome")
 TRIP.GenomeFile <- file.path( TRIP.PATH, "CustomMutantGenome/MTb.TRIP.MutantGenome.fasta")
 TRIP.CompleteGeneFile <- file.path( TRIP.PATH, "CustomMutantGenome/TRIP.Complete207.Primers.txt")

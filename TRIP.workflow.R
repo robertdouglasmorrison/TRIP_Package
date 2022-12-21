@@ -1,7 +1,9 @@
 # TRIP.workflow.R -- an explanatory example workflow
 
+# define where the TRIP_Screen tools were installed
 TRIP.PATH <- "~/TRIP_Screen"
-# load the scripts
+
+# load the main script that define all functions
 source( file.path( TRIP.PATH, "mutantAligner.R"))
 
 # don't use too many cores on Lenovo to save memory (as each sample will use multiple cores under the hood)
