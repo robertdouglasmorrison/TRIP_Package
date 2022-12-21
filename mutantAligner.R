@@ -7,6 +7,7 @@
 #						https://www.nature.com/articles/s41564-020-00810-x
 #						changing plot formats to PDF
 #			Nov 2022  - removing support for Bowtie1, cleaning & trimming for GitHub upload
+#			Dec 2022  - adjust paths to let these scripts be called from any user path
 
 
 library( DuffyNGS)
@@ -20,12 +21,13 @@ BOWTIE2_PROGRAM <- Sys.which( "bowtie2")
 if ( ! nchar( BOWTIE2_PROGRAM)) stop( "Unable to find 'bowtie2' on the search path")
 
 # the genones and target indexes, and the set of mutants
-TRIP.BowtieIndex <- "./BowtieIndexes/MTb.TRIP.MutantGenome"
-TRIP.GenomeFile <- "./CustomMutantGenome/MTb.TRIP.MutantGenome.fasta"
-TRIP.CompleteGeneFile <- "./CustomMutantGenome/TRIP.Complete207.Primers.txt"
+TRIP.PATH <- "~/TRIP_Screen"	# set this as needed 
+TRIP.BowtieIndex <- file.path( TRIP.PATH, "BowtieIndexes/MTb.TRIP.MutantGenome")
+TRIP.GenomeFile <- file.path( TRIP.PATH, "CustomMutantGenome/MTb.TRIP.MutantGenome.fasta")
+TRIP.CompleteGeneFile <- file.path( TRIP.PATH, "CustomMutantGenome/TRIP.Complete207.Primers.txt")
 
 # folder layout where to read from and write to
-ResultsFolder <- "Results"
+ResultsFolder <- "./Results"
 
 # the required fields in the sample key file
 SampleKeyColumns <- c("SampleID", "Experiment", "Day", "Replicate", "ATc_Induced", "Class",
