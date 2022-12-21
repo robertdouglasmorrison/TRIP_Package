@@ -866,6 +866,8 @@ plotAlignmentOverview <- function( m=outStats, samples, results.path=".") {
 	nKeys <- length( keys)
 	colorSet <- rainbow( nKeys, end=0.8)
 	col <- colorSet[ match( sampleKey, keys)]
+	# if we have only one class & subclass, show the full IDs
+	if ( nKeys < 2) sampleText <- getSampleLabel( samples, mode="ID")
 	
 	# set up, and size by how many to draw
 	xlim <- range( x) * c( 0.3, 1.25)
