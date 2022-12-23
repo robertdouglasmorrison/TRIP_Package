@@ -74,8 +74,8 @@ par( mai=c(0.6,0.4,0.6, 0.4))
 # the file to match what the pipeline expects.
 
 # Sharing Day Zero Uninduced samples:  typically there will not be baseline samples for every set
-# of samples to be modeled.  The 'sharedDayZeroUninduced' argument is provided to let you specify a 
-# character string that is one name from the 'SubClass1' column, to help the tool decide which day zero
+# of samples to be modeled.  The 'sharedDayZeroUninduced' argument is provided to let you specify a vector of
+# character strings that are names from the 'Class/SubClass1/SubClass2' columns, to help the tool decide which day zero
 # samples can be used by all other classes of experiments/drugs, etc.   Not very elegant, can be
 # adjusted as needed for future experiments.
 
@@ -1461,11 +1461,10 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 			mysub2 <- smlTbl$SubClass2[1]
 			
 			# allow the addition of the common shared day zero uninduced data
-			if ( !is.null(sharedDayZeroUninduced)) {
-				if ( length(commonDayZeroUNDrows)) {
-					xx <- union( xx, commonDayZeroUNDrows)
-					smlTbl <- tbl[ xx, ]
-				}
+			if ( !is.null(sharedDayZeroUninduced) && length(commonDayZeroUNDrows)) {
+				cat( "\nDebug: adding shared day 0 rows: ", xx, "|", commonDayZeroUNDrows)
+				xx <- union( xx, commonDayZeroUNDrows)
+				smlTbl <- tbl[ xx, ]
 			}
 
 			# there may be cases where all the rows in a SubClass are day 0/1. as when its a negative control
