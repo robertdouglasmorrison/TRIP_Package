@@ -45,7 +45,7 @@ MAX_RAW_READS <- 2000000
 
 # crop low abunance values for math stability.  
 # RPMHEG = Reads Per Million per Hundred Expected Genes  (i.e number of mutants in the pool)
-MIN_LOG2_RPMHEG <- 4
+MIN_LOG2_RPMHEG <- 3
 
 checkX11( bg="white", width=10, height=7)
 par( mai=c(0.6,0.4,0.6, 0.4))
@@ -1427,15 +1427,23 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 		facSub2 <- factor(tbl$SubClass2)
 		
 		# allow a common shared set of Day Zero uninduced measrurements to be shared
+		# let's relax this rule to look in multiple class columns, and let the term be a vector of text strings
 		commonDayZeroUNDrows <- vector()
 		if ( ! is.null( sharedDayZeroUninduced)) {
-			# first & only place to check is SubClass1
-			if ( any (tbl$SubClass1 == sharedDayZeroUninduced)) {
-				commonDayZeroUNDrows <- which( tbl$Day %in% DAY_ZERO & tbl$SubClass1 == sharedDayZeroUninduced)
+			# first place to check is SubClass1
+			common1 <- common2 <- common3 <- vector()
+			if ( any (tbl$SubClass1 %in%  sharedDayZeroUninduced)) {
+				common1 <- which( tbl$Day %in% DAY_ZERO & tbl$SubClass1 %in% sharedDayZeroUninduced)
 			}
-			#if ( any (tbl$Class == sharedDayZeroUninduced)) {
-			#	commonDayZeroUNDrows <- which( tbl$Day %in% DAY_ZERO & tbl$Class == sharedDayZeroUninduced)
-			#}
+			# second place to check is Class
+			if ( any (tbl$Class %in% sharedDayZeroUninduced)) {
+				common2 <- which( tbl$Day %in% DAY_ZERO & tbl$Class %in% sharedDayZeroUninduced)
+			}
+			# third place to check is SubClass2
+			if ( any (tbl$SubClass2 %in% sharedDayZeroUninduced)) {
+				common3 <- which( tbl$Day %in% DAY_ZERO & tbl$SubClass2 %in% sharedDayZeroUninduced)
+			}
+			commonDayZeroUNDrows <- sort( unique( c( common1, common2, common3)))
 		}
 		
 		by( tbl, INDICES=list( facClass, facSub1, facSub2), function(x) {
