@@ -82,8 +82,8 @@ par( mai=c(0.6,0.4,0.6, 0.4))
 
 
 do.all <- function( sampleKeyFile, doBowtie=FALSE, dropZeroGenes=TRUE, 
-				verbose=FALSE, experiment=NULL, doAlignStats=doBowtie, doPairs=FALSE, makePies=TRUE, 
-				makeROC=FALSE, doMODEL=TRUE, sharedDayZero=NULL,
+				verbose=FALSE, experiment=NULL, doAlignStats=doBowtie, doPairs=FALSE, 
+				makePies=FALSE, makeROC=FALSE, doMODEL=TRUE, sharedDayZero=NULL,
 				trim5=0, trim3=0, max.reads=MAX_RAW_READS) {
 	
 	# set the needed Genome & Target index for TRIP
@@ -574,7 +574,10 @@ summarizeMutantAlignments.TRIP <- function( sid, rowptr=0, results.path=".", mak
 	nPolyn2 <- length( isPolyn2 <- c( isAnchPolyn, isEmptyPolyn, isGenePolyn, isNoPolyn, isDoublePolyn))
 
 	# make a visual of the distribution
-	if (makePie) {
+	piePath <- file.path( results.path, "PIE.Plots")
+	if ( ! file.exists( piePath)) dir.create( piePath, recursive=T)
+	pieFile <- file.path( piePath, paste( sid, "MatePair.Profile.pdf", sep="."))
+	if ( makePie || ! file.exists(pieFile)) {
 		cnts <- c( length(isGeneAnch), length(isAnchGene), length(isAnchNo), length( isNoAnch), length(isGeneNo), length( isNoGene),
 				length(isDoubleAnch), length(isDoubleGene), length(isDoubleNo), length( isDoubleEmpty), 
 				length(isAnchEmpty), length( isEmptyAnch), length( isGeneEmpty), length( isEmptyGene),
@@ -646,10 +649,6 @@ summarizeMutantAlignments.TRIP <- function( sid, rowptr=0, results.path=".", mak
 				format="d", big.mark=","))
 		text( 0, ylo, subText, font=2, cex=1.2, pos=3)
 		dev.flush()
-
-		piePath <- file.path( results.path, "PIE.Plots")
-		if ( ! file.exists( piePath)) dir.create( piePath, recursive=T)
-		pieFile <- file.path( piePath, paste( sid, "MatePair.Profile.pdf", sep="."))
 		dev.print( pdf, pieFile, width=14, height=9)
 	}
 
