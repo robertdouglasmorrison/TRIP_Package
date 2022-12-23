@@ -8,6 +8,7 @@
 #						changing plot formats to PDF
 #			Nov 2022  - removing support for Bowtie1, cleaning & trimming for GitHub upload
 #			Dec 2022  - adjust paths to let these scripts be called from any user path
+#			Dec 2022  - making the 'sharedDayZero' argument more flexible
 
 
 # if not done already by a caller, define the path to the TRIP_Screen installion 
@@ -43,7 +44,7 @@ DAY_ZERO <- c( 0, 1)
 # allow setting a maximum number of raw reads to align per sample
 MAX_RAW_READS <- 2000000
 
-# crop low abunance values for math stability.  
+# crop low abunance values for math stability.  Samples below this threshold excluded from modelling.
 # RPMHEG = Reads Per Million per Hundred Expected Genes  (i.e number of mutants in the pool)
 MIN_LOG2_RPMHEG <- 3
 
@@ -73,8 +74,8 @@ par( mai=c(0.6,0.4,0.6, 0.4))
 # Most problems are due to mistakes or omissions in the 'SampleKey' file.  It can take some effort to organize 
 # the file to match what the pipeline expects.
 
-# Sharing Day Zero Uninduced samples:  typically there will not be baseline samples for every set
-# of samples to be modeled.  The 'sharedDayZeroUninduced' argument is provided to let you specify a vector of
+# Sharing Day Zero samples:  typically there will not be baseline samples for every subset
+# of samples to be modeled.  The 'sharedDayZero' argument is provided to let you specify a vector of
 # character strings that are names from the 'Class/SubClass1/SubClass2' columns, to help the tool decide which day zero
 # samples can be used by all other classes of experiments/drugs, etc.   Not very elegant, can be
 # adjusted as needed for future experiments.
@@ -82,7 +83,7 @@ par( mai=c(0.6,0.4,0.6, 0.4))
 
 do.all <- function( sampleKeyFile, doBowtie=FALSE, dropZeroGenes=TRUE, 
 				verbose=FALSE, experiment=NULL, doAlignStats=doBowtie, doPairs=FALSE, makePies=TRUE, 
-				makeROC=FALSE, doMODEL=TRUE, sharedDayZeroUninduced=NULL,
+				makeROC=FALSE, doMODEL=TRUE, sharedDayZero=NULL,
 				trim5=0, trim3=0, max.reads=MAX_RAW_READS) {
 	
 	# set the needed Genome & Target index for TRIP
@@ -216,8 +217,7 @@ do.all <- function( sampleKeyFile, doBowtie=FALSE, dropZeroGenes=TRUE,
 	plotAlignmentOverview( outStats, allSamples, results.path=results.path)
 
 	# when we are all done, try to run the growth defect code as a last step
-	if ( doMODEL) model.All.TRIP.Samples( sampleKeyFile, sharedDayZeroUninduced=sharedDayZeroUninduced,
-							experiment=experiment)
+	if ( doMODEL) model.All.TRIP.Samples( sampleKeyFile, sharedDayZero=sharedDayZero, experiment=experiment)
 	
 	cat( "\nDone.\n")
 }
@@ -1379,7 +1379,7 @@ plotOneGene.TRIP <- function( gene, dfsIND, dfsUNIND, modelsIND, modelsUNIND,
 # top level function to model the growth defects and make plots and growth defect summarys 
 # for all experiments in one sample key file
 model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
-				sharedDayZeroUninduced=NULL, makePlots=TRUE, experiment=NULL) {
+				sharedDayZero=NULL, makePlots=TRUE, experiment=NULL) {
 
 	# load that sample key
 	allSamples <- loadSampleKeyFile( sampleKeyFile)
@@ -1429,19 +1429,19 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 		# allow a common shared set of Day Zero uninduced measrurements to be shared
 		# let's relax this rule to look in multiple class columns, and let the term be a vector of text strings
 		commonDayZeroUNDrows <- vector()
-		if ( ! is.null( sharedDayZeroUninduced)) {
+		if ( ! is.null( sharedDayZero)) {
 			# first place to check is SubClass1
 			common1 <- common2 <- common3 <- vector()
-			if ( any (tbl$SubClass1 %in%  sharedDayZeroUninduced)) {
-				common1 <- which( tbl$Day %in% DAY_ZERO & tbl$SubClass1 %in% sharedDayZeroUninduced)
+			if ( any (tbl$SubClass1 %in%  sharedDayZero)) {
+				common1 <- which( tbl$Day %in% DAY_ZERO & tbl$SubClass1 %in% sharedDayZero)
 			}
 			# second place to check is Class
-			if ( any (tbl$Class %in% sharedDayZeroUninduced)) {
-				common2 <- which( tbl$Day %in% DAY_ZERO & tbl$Class %in% sharedDayZeroUninduced)
+			if ( any (tbl$Class %in% sharedDayZero)) {
+				common2 <- which( tbl$Day %in% DAY_ZERO & tbl$Class %in% sharedDayZero)
 			}
 			# third place to check is SubClass2
-			if ( any (tbl$SubClass2 %in% sharedDayZeroUninduced)) {
-				common3 <- which( tbl$Day %in% DAY_ZERO & tbl$SubClass2 %in% sharedDayZeroUninduced)
+			if ( any (tbl$SubClass2 %in% sharedDayZero)) {
+				common3 <- which( tbl$Day %in% DAY_ZERO & tbl$SubClass2 %in% sharedDayZero)
 			}
 			commonDayZeroUNDrows <- sort( unique( c( common1, common2, common3)))
 		}
@@ -1461,7 +1461,7 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 			mysub2 <- smlTbl$SubClass2[1]
 			
 			# allow the addition of the common shared day zero uninduced data
-			if ( !is.null(sharedDayZeroUninduced) && length(commonDayZeroUNDrows)) {
+			if ( !is.null(sharedDayZero) && length(commonDayZeroUNDrows)) {
 				xx <- union( xx, commonDayZeroUNDrows)
 				smlTbl <- tbl[ xx, ]
 			}
