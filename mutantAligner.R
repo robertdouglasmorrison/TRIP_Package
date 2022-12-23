@@ -1448,7 +1448,7 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 		
 		# change the logic here to make sure we alway allow the shared day 0, but never use those samples twice
 		#by( tbl, INDICES=list( facClass, facSub1, facSub2), function(x) {
-		tapply( 1:nrow(tbl), INDICES=list( facClass, facSub1, facSub2), function(xx) {
+		tapply( 1:nrow(tbl), INDEX=list( facClass, facSub1, facSub2), function(xx) {
 
 			# make sure we have data, and get the class details
 			if ( ! length(xx)) return()
@@ -1462,7 +1462,6 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 			
 			# allow the addition of the common shared day zero uninduced data
 			if ( !is.null(sharedDayZeroUninduced) && length(commonDayZeroUNDrows)) {
-				cat( "\nDebug: adding shared day 0 rows: ", xx, "|", commonDayZeroUNDrows)
 				xx <- union( xx, commonDayZeroUNDrows)
 				smlTbl <- tbl[ xx, ]
 			}
