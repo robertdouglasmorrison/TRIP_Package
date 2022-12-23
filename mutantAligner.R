@@ -1446,10 +1446,14 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 			commonDayZeroUNDrows <- sort( unique( c( common1, common2, common3)))
 		}
 		
-		by( tbl, INDICES=list( facClass, facSub1, facSub2), function(x) {
+		# change the logic here to make sure we alway allow the shared day 0, but never use those samples twice
+		#by( tbl, INDICES=list( facClass, facSub1, facSub2), function(x) {
+		tapply( 1:nrow(tbl), INDICES=list( facClass, facSub1, facSub2), function(xx) {
 
 			# make sure we have data, and get the class details
-			if (nrow(x) < 1) return()
+			if ( ! length(xx)) return()
+			x <- tbl[ xx, ]
+
 			desc <- createClassDescriptor(x)
 			cat( "\nModelling:  ", desc, "\n")
 			myclass <- x$Class[1]
@@ -1457,10 +1461,10 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 			mysub2 <- x$SubClass2[1]
 			
 			# allow the addition of the common shared day zero uninduced data
-			if ( !is.null(sharedDayZeroUninduced) && mysub1 != sharedDayZeroUninduced) {
+			if ( !is.null(sharedDayZeroUninduced)) {
 				if ( length(commonDayZeroUNDrows)) {
-					smlDF <- tbl[ commonDayZeroUNDrows, ]
-					x <- rbind( x, smlDF)
+					xx <- union( xx, commonDayZeroUNDrows)
+					x <- tbl[ xx, ]
 				}
 			}
 
