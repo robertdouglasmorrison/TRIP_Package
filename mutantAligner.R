@@ -1452,28 +1452,28 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 
 			# make sure we have data, and get the class details
 			if ( ! length(xx)) return()
-			x <- tbl[ xx, ]
+			smlTbl <- tbl[ xx, ]
 
-			desc <- createClassDescriptor(x)
+			desc <- createClassDescriptor(smlTbl)
 			cat( "\nModelling:  ", desc, "\n")
-			myclass <- x$Class[1]
-			mysub1 <- x$SubClass1[1]
-			mysub2 <- x$SubClass2[1]
+			myclass <- smlTbl$Class[1]
+			mysub1 <- smlTbl$SubClass1[1]
+			mysub2 <- smlTbl$SubClass2[1]
 			
 			# allow the addition of the common shared day zero uninduced data
 			if ( !is.null(sharedDayZeroUninduced)) {
 				if ( length(commonDayZeroUNDrows)) {
 					xx <- union( xx, commonDayZeroUNDrows)
-					x <- tbl[ xx, ]
+					smlTbl <- tbl[ xx, ]
 				}
 			}
 
 			# there may be cases where all the rows in a SubClass are day 0/1. as when its a negative control
 			# group.   If so, catch it here and do nothing
-			if ( all (x$Day %in% DAY_ZERO)) return()
+			if ( all (smlTbl$Day %in% DAY_ZERO)) return()
 
 			# call the modeler
-			ans <- model.TRIP.GrowthDefects(x, makePlots=makePlots, plot.path=plot.path,
+			ans <- model.TRIP.GrowthDefects(smlTbl, makePlots=makePlots, plot.path=plot.path,
 						plot.prefix=desc, asPDF=TRUE)
 			saveModelAns <<- ans
 
