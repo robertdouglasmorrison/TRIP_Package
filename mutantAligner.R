@@ -908,6 +908,21 @@ plotAlignmentOverview <- function( m=outStats, samples, results.path=".") {
 	legend( 'bottomright', keys, pch=21, pt.bg=colorSet, cex=leg.cex, pt.cex=1.3)
 	outfile <- file.path( results.path, paste( "AlignmentSuccessOverview", "pdf", sep="."))
 	dev.print( pdf, outfile, width=14, height=9)
+
+	# make a barplot of the read counts
+	par( mai=c( 2.5, 1, 0.8, 0.4))
+
+	cntM <- as.matrix( m[ , c( 'StartingReads', 'ValidPairs')])
+	rownames(cntM) <- rownames(m)
+	cntM[ is.na(cntM)] <- 0
+	colorSet <- c( 'tan', 'green')
+
+	barplot( t( cntM), beside=T, xlab=NA, ylab="Number of Read Pairs", main="Read Counts Overview",
+		ylim=c(0,max(cntM[,1])*1.05), col=colorSet, las=3)
+
+	legend( 'topleft', c( "Raw Read Pairs", "Valid Pairs"), fill=colorSet, cex=leg.cex)
+	outfile <- file.path( results.path, paste( "ReadCountsOverview", "pdf", sep="."))
+	dev.print( pdf, outfile, width=14, height=9)
 }
 
 
