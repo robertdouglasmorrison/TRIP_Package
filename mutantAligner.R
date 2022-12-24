@@ -47,6 +47,7 @@ MAX_RAW_READS <- 2000000
 # crop low abunance values for math stability.  Samples below this threshold excluded from modelling.
 # RPMHEG = Reads Per Million per Hundred Expected Genes  (i.e number of mutants in the pool)
 MIN_LOG2_RPMHEG <- 3
+MIN_READ_PAIRS <- 20000
 
 checkX11( bg="white", width=10, height=7)
 par( mai=c(0.6,0.4,0.6, 0.4))
@@ -693,10 +694,10 @@ writeResultTables <- function( tbl, samples, results.path, nExpectedGenes, poolG
 	for ( i in 1:nSamples) {
 		v <- tbl[ , i]
 		expectedGenesFactor <- nExpectedGenes[i] / 100
-		vnorm <- v * expectedGenesFactor * 1000000 / sum(v)
+		vnorm <- v * expectedGenesFactor * 1000000 / max( sum(v), MIN_READ_PAIRS)
 		outRPMlog2[ , i] <- log2( vnorm + 1)
 		v <- expect[ , i]
-		vnorm <- v * expectedGenesFactor * 1000000 / sum(v)
+		vnorm <- v * expectedGenesFactor * 1000000 / max( sum(v), MIN_READ_PAIRS)
 		expectRPMlog2[ , i] <- log2( vnorm + 1)
 		cat( "\r", colnames(tbl)[i])
 	}
@@ -909,7 +910,7 @@ plotAlignmentOverview <- function( m=outStats, samples, results.path=".") {
 	outfile <- file.path( results.path, paste( "AlignmentSuccessOverview", "pdf", sep="."))
 	dev.print( pdf, outfile, width=14, height=9)
 
-	# make a barplot of the read counts
+	# also make a barplot of the read counts
 	par( mai=c( 2.5, 1, 0.8, 0.4))
 
 	cntM <- as.matrix( m[ , c( 'StartingReads', 'ValidPairs')])
@@ -919,6 +920,9 @@ plotAlignmentOverview <- function( m=outStats, samples, results.path=".") {
 
 	barplot( t( cntM), beside=T, xlab=NA, ylab="Number of Read Pairs", main="Read Counts Overview",
 		ylim=c(0,max(cntM[,1])*1.05), col=colorSet, las=3)
+
+	lines( c( -10, 1000), rep.int( MIN_READ_PAIRS, 2), lty=2, lwd=3, col='grey50')
+	text( nPts*1.5, MIN_READ_PAIRS, "Minimum Valid Pairs", col='grey50', cex=0.8, pos=3)
 
 	legend( 'topleft', c( "Raw Read Pairs", "Valid Pairs"), fill=colorSet, cex=leg.cex)
 	outfile <- file.path( results.path, paste( "ReadCountsOverview", "pdf", sep="."))
