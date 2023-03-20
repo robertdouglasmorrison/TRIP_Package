@@ -9,6 +9,7 @@
 #			Nov 2022  - removing support for Bowtie1, cleaning & trimming for GitHub upload
 #			Dec 2022  - adjust paths to let these scripts be called from any user path
 #			Dec 2022  - making the 'sharedDayZero' argument more flexible
+#			Mar 2023  - adding normalization by uninduced read abundance
 
 
 # if not done already by a caller, define the path to the TRIP_Screen installion 
@@ -218,7 +219,10 @@ do.all <- function( sampleKeyFile, doBowtie=FALSE, dropZeroGenes=TRUE,
 	plotAlignmentOverview( outStats, allSamples, results.path=results.path)
 
 	# when we are all done, try to run the growth defect code as a last step
-	if ( doMODEL) model.All.TRIP.Samples( sampleKeyFile, sharedDayZero=sharedDayZero, experiment=experiment)
+	if ( doMODEL) {
+		model.All.TRIP.Samples( sampleKeyFile, sharedDayZero=sharedDayZero, experiment=experiment, normalized=FALSE)
+		model.All.TRIP.Samples( sampleKeyFile, sharedDayZero=sharedDayZero, experiment=experiment, normalized=TRUE)
+	}
 	
 	cat( "\nDone.\n")
 }
@@ -682,43 +686,76 @@ summarizeMutantAlignments.TRIP <- function( sid, rowptr=0, results.path=".", mak
 writeResultTables <- function( tbl, samples, results.path, nExpectedGenes, poolGenes, experiment, 
 				makeROC=FALSE, runName="") {
 
-	# turn these raw counts of all genes into log2 RPMHEG, etc.
-	outRPMlog2 <- tbl
-	expectRPMlog2 <- expect <- tbl[ which( rownames(tbl) %in% poolGenes), , drop=F]
+	# turn these raw counts of all genes into various normalized RPMHEG and Log2 transformed units
+	# then write them all to disk
+	outRPM <- outLog2 <- outNRPM <- outNLog2 <- tbl
+	expectRPM <- expectLog2 <- expectNRPM <- expectNLog2 <- expect <- tbl[ which( rownames(tbl) %in% poolGenes), , drop=F]
+	outfile <- file.path( results.path, paste( "AllGenes.RawCounts", experiment, "txt", sep="."))
+	outDF <- data.frame( "GeneID"=rownames(tbl), tbl, stringsAsFactors=F)
+	write.table( outDF, outfile, sep="\t", quote=F, row.names=F)
+	expectfile <- file.path( results.path, paste( "PoolGenes.RawCounts", experiment, "txt", sep="."))
+	expectDF <- data.frame( "GeneID"=rownames(expect), expect, stringsAsFactors=F)
+	write.table( expectDF, expectfile, sep="\t", quote=F, row.names=F)
 
 	cat( "\nNormalizing to RPM_HEG units..\n")
 	nSamples <- ncol(tbl)
 	nGenes <- nrow(tbl)
 	if ( nrow(samples) != nSamples) stop( "Sample / matrix sizing error!")
-
 	for ( i in 1:nSamples) {
 		v <- tbl[ , i]
 		expectedGenesFactor <- nExpectedGenes[i] / 100
 		vnorm <- v * expectedGenesFactor * 1000000 / max( sum(v), MIN_READ_PAIRS)
-		outRPMlog2[ , i] <- log2( vnorm + 1)
+		outRPM[ , i] <- vnorm
 		v <- expect[ , i]
 		vnorm <- v * expectedGenesFactor * 1000000 / max( sum(v), MIN_READ_PAIRS)
-		expectRPMlog2[ , i] <- log2( vnorm + 1)
+		expectRPM[ , i] <- vnorm
 		cat( "\r", colnames(tbl)[i])
 	}
+	outfile <- file.path( results.path, paste( "AllGenes.RPMHEG", experiment, "txt", sep="."))
+	outDF <- data.frame( "GeneID"=rownames(outRPM), round(outRPM,digits=3), stringsAsFactors=F)
+	write.table( outDF, outfile, sep="\t", quote=F, row.names=F)
+	expectfile <- file.path( results.path, paste( "PoolGenes.RPMHEG", experiment, "txt", sep="."))
+	expectDF <- data.frame( "GeneID"=rownames(expectRPM), round(expectRPM,digits=3), stringsAsFactors=F)
+	write.table( expectDF, expectfile, sep="\t", quote=F, row.names=F)
 
-	outfile <- file.path( results.path, paste( "AllGenes.RawCounts", experiment, "txt", sep="."))
-	out <- data.frame( "GeneID"=rownames(tbl), tbl, stringsAsFactors=F)
-	write.table( out, outfile, sep="\t", quote=F, row.names=F)
-	expectfile <- file.path( results.path, paste( "PoolGenes.RawCounts", experiment, "txt", sep="."))
-	expect <- data.frame( "GeneID"=rownames(expect), expect, stringsAsFactors=F)
-	write.table( expect, expectfile, sep="\t", quote=F, row.names=F)
-
+	# do the normalization based on uninduced samples, to try to compensate for changing mutant proportions over time
+	outNRPM <- normalizeByUninduced( outRPM, samples=samples, nExpectedGenes)
+	expectNRPM <- normalizeByUninduced( expectRPM, samples=samples, nExpectedGenes)
+	outfile <- file.path( results.path, paste( "AllGenes.Normalized.RPMHEG", experiment, "txt", sep="."))
+	outDF <- data.frame( "GeneID"=rownames(outNRPM), round(outNRPM,digits=3), stringsAsFactors=F)
+	write.table( outDF, outfile, sep="\t", quote=F, row.names=F)
+	expectfile <- file.path( results.path, paste( "PoolGenes.Normalized.RPMHEG", experiment, "txt", sep="."))
+	expectDF <- data.frame( "GeneID"=rownames(expectNRPM), round(expectNRPM,digits=3), stringsAsFactors=F)
+	write.table( expectDF, expectfile, sep="\t", quote=F, row.names=F)
+	
+	
+	cat( "\nTransforming to Log2 units..\n")
+	for ( i in 1:nSamples) {
+		v <- tbl[ , i]
+		outLog2[ , i] <- log2( outRPM[ , i] + 1)
+		expectLog2[ , i] <- log2( expectRPM[ , i] + 1)
+		outNLog2[ , i] <- log2( outNRPM[ , i] + 1)
+		expectNLog2[ , i] <- log2( expectNRPM[ , i] + 1)
+		cat( "\r", colnames(tbl)[i])
+	}
 	if ( makeROC) {
-		makeROCimage( outRPMlog2, poolGenes=poolGenes, text="Log2 RPMHEG", experiment=experiment, 
+		makeROCimage( outLog2, poolGenes=poolGenes, text="Log2 RPMHEG", experiment=experiment, 
+				results.path=results.path)
+		makeROCimage( outNLog2, poolGenes=poolGenes, text="Normalized Log2 RPMHEG", experiment=experiment, 
 				results.path=results.path)
 	}
 	outfile <- file.path( results.path, paste( "AllGenes.Log2RPMHEG", experiment, "txt", sep="."))
-	out <- data.frame( "GeneID"=rownames(outRPMlog2), outRPMlog2, stringsAsFactors=F)
-	write.table( out, outfile, sep="\t", quote=F, row.names=F)
+	outDF <- data.frame( "GeneID"=rownames(outLog2), round(outLog2,digits=5), stringsAsFactors=F)
+	write.table( outDF, outfile, sep="\t", quote=F, row.names=F)
 	expectfile <- file.path( results.path, paste( "PoolGenes.Log2RPMHEG", experiment, "txt", sep="."))
-	expect <- data.frame( "GeneID"=rownames(expectRPMlog2), expectRPMlog2, stringsAsFactors=F)
-	write.table( expect, expectfile, sep="\t", quote=F, row.names=F)
+	expectDF <- data.frame( "GeneID"=rownames(expectLog2), round(expectLog2,digits=5), stringsAsFactors=F)
+	write.table( expectDF, expectfile, sep="\t", quote=F, row.names=F)
+	outfile <- file.path( results.path, paste( "AllGenes.Normalized.Log2RPMHEG", experiment, "txt", sep="."))
+	outDF <- data.frame( "GeneID"=rownames(outNLog2), round(outNLog2,digits=5), stringsAsFactors=F)
+	write.table( outDF, outfile, sep="\t", quote=F, row.names=F)
+	expectfile <- file.path( results.path, paste( "PoolGenes.Normalized.Log2RPMHEG", experiment, "txt", sep="."))
+	expectDF <- data.frame( "GeneID"=rownames(expectNLog2), round(expectNLog2,digits=5), stringsAsFactors=F)
+	write.table( expectDF, expectfile, sep="\t", quote=F, row.names=F)
 
 	# lastly, make a table with all meta data and all genes for modeling etc.
 	# there is potential for confusion here, about what genes to include in the model, if the
@@ -733,19 +770,20 @@ writeResultTables <- function( tbl, samples, results.path, nExpectedGenes, poolG
 	} else {
 		completeGenes <- getMutantPoolGenes( myPoolNames)
 	}
-	outCounts <- matrix( NA, nrow=ncol(expectRPMlog2), ncol=length(completeGenes))
-	colnames(outCounts) <- completeGenes
-	rownames(outCounts) <- samples$SampleID
+	outCounts <- outCounts2 <- matrix( NA, nrow=ncol(expectLog2), ncol=length(completeGenes))
+	colnames(outCounts) <- colnames(outCounts2) <- completeGenes
+	rownames(outCounts) <- rownames(outCounts2) <- samples$SampleID
 
 	# first the log2 RPMHEG counts
-	where <- match( rownames(expectRPMlog2), completeGenes)
+	where <- match( rownames(expectLog2), completeGenes)
 	if ( any( is.na(where))) {
 		cat( "\n\nSome GeneIDs not in the 'CompleteGene' set:\n")
-		cat( "\nN: ", sum(is.na(where)), "  Who:  ", rownames(expectRPMlog2)[is.na(where)])
+		cat( "\nN: ", sum(is.na(where)), "  Who:  ", rownames(expectLog2)[is.na(where)])
 	}
 	for (i in 1:nGenes) {
 		if ( is.na( where[i])) next
-		outCounts[ , where[i]] <- expectRPMlog2[ i, ]
+		outCounts[ , where[i]] <- expectLog2[ i, ]
+		outCounts2[ , where[i]] <- expectNLog2[ i, ]
 	}
 	# then all the meta data (SampleID through Mutant Pool)
 	outMeta <- samples[ , MetaDataColumns]
@@ -754,9 +792,62 @@ writeResultTables <- function( tbl, samples, results.path, nExpectedGenes, poolG
 	readCnts <- apply( tbl, MARGIN=2, sum, na.rm=T)
 	out <- data.frame( "SampleID"=outMeta[ ,1], "Run"=runName, outMeta[ ,2:ncol(outMeta)], "ReadCount"=readCnts, 
 				round( outCounts, digits=4), stringsAsFactors=FALSE)
-	rownames(out) <- 1:nrow(out)
+	out2 <- data.frame( "SampleID"=outMeta[ ,1], "Run"=runName, outMeta[ ,2:ncol(outMeta)], "ReadCount"=readCnts, 
+				round( outCounts2, digits=4), stringsAsFactors=FALSE)
+	rownames(out) <- rownames(out2) <- 1:nrow(out)
 	outfile <- file.path( results.path, paste( "FinalResults", experiment, "txt", sep="."))
 	write.table( out, outfile, sep="\t", quote=F, row.names=F)
+	outfile2 <- file.path( results.path, paste( "Normalized.FinalResults", experiment, "txt", sep="."))
+	write.table( out2, outfile2, sep="\t", quote=F, row.names=F)
+}
+
+
+normalizeByUninduced <- function( tbl, samples, nExpectedGenes=rep.int( 100, ncol(tbl)),
+				max.scale.factor=1024) {
+
+	# given a matrix of RPMHEG normalized read count data, apply a second round of normalization,
+	# meant to compensate for how some mutant poolss may expand or contract overtime, separate from
+	# any induction effect.  The idea is to put all time points at a similar abundance in the 
+	# UnInduced samples, so Induction effect is less impacted by overall trends
+	
+	if ( ! all( colnames(tbl) == samples$SampleID)) stop( "Sample vs matrix sizing or naming error!")
+	NC <- ncol(tbl)
+	
+	# know the induction status for every sample
+	isInduced <- samples$ATc_Induced
+	useForNorm <- which( isInduced == FALSE)
+
+	# build a sample key of all facts except induction.  We process one experiment at a time, so that fact not in the key
+	sKey <- paste( samples$Day, samples$Class, samples$SubClasss1, samples$SubClasss2, samples$MutantPool, sep="::")
+	sKeyFac <- factor(sKey)
+	sKeyPtrs <- tapply( 1:NC, sKeyFac, FUN=NULL)
+	
+	out <- tbl
+	min.scale.factor <- 1 / max.scale.factor
+	for ( i in 1:nrow(tbl)) {
+		vIn <- tbl[ i, ]
+		# now give each sample the mean scale factor from it's set of uninduced matched sample
+		allScaleFac <- rep.int(1, NC)
+		for ( k in 1:NC) {
+			mySet <- which( sKeyPtrs == sKeyPtrs[k])
+			myUnindPtrs <- intersect( mySet, useForNorm)
+			if ( length(myUnindPtrs)) {
+				# use all uninduced to pick a central target
+				globalAvg <- sqrtmean( vIn[useForNorm], na.rm=T)
+				if (globalAvg < 1) globalAvg <- 1
+				# then use only the subset from this subset's uninduced to make the scale term
+				scaleFac <- median( globalAvg / vIn[myUnindPtrs], na.rm=T)
+				scaleFac[ is.na(scaleFac)] <- 1
+				scaleFac[ is.nan(scaleFac)] <- 1
+				scaleFac[ scaleFac > max.scale.factor] <- max.scale.factor
+				scaleFac[ scaleFac < min.scale.factor] <- min.scale.factor
+				allScaleFac[k] <- scaleFac
+			}
+		}
+		vOut <- vIn * allScaleFac
+		out[ i, ] <- vOut
+	}
+	return(out)
 }
 
 
@@ -959,7 +1050,7 @@ makeROCimage <- function( out, poolGenes, text, experiment, results.path=".") {
 	textLabel <- paste( "Experiment:  ", experiment, "      Abundance Units:  ", text)
 	ans <- duffy.ROC( goodScores, badScores, label=textLabel)
 
-	plotFile <- file.path( results.path, paste( "ROC", experiment, gsub(" ","",text), "pdf", sep="."))
+	plotFile <- file.path( results.path, paste( "ROC", experiment, gsub(" ",".",text), "pdf", sep="."))
 	dev.print( pdf, plotFile, width=14,  height=9)
 	return( ans)
 }
@@ -1097,7 +1188,8 @@ createClassDescriptor <- function( tbl) {
 #    Note:  for the high level wrapper called by the "do.all()" function, see:  model.All.TRIP.Samples()
 
 model.TRIP.GrowthDefects <- function( tbl, min.value=MIN_LOG2_RPMHEG, makePlots=FALSE, 
-					plot.path=".", plot.prefix=NULL, asPDF=makePlots) {
+					plot.path=".", plot.prefix=NULL, asPDF=makePlots,
+					normalized=FALSE) {
 
 	# given a data frame of final results (large table with columns of meta data & Mutant gene log2RPMHEG data)
 	# calculate all growth defects from 'Induced' vs 'Uninduced'
@@ -1260,7 +1352,7 @@ model.TRIP.GrowthDefects <- function( tbl, min.value=MIN_LOG2_RPMHEG, makePlots=
 		if ( haveDataToPlot && makePlots) {
 			plotOneGene.TRIP( thisGene, dfByDayIND, dfByDayUNIND, modelAnsByDayIND, modelAnsByDayUNIND, 
 					plot.path=plot.path, plot.prefix=plot.prefix, asPDF=asPDF, 
-					showGrowth=finalGrowth, showPvalue=finalPvalue)
+					showGrowth=finalGrowth, showPvalue=finalPvalue, normalized=normalized)
 		}
 	}
 	return( list( "GrowthDefect"=growthRate, "P_Value"=growthPvalue))
@@ -1298,7 +1390,7 @@ forceEnoughModelData <- function( df) {
 # Used as hyperlink images in final HTML files.
 plotOneGene.TRIP <- function( gene, dfsIND, dfsUNIND, modelsIND, modelsUNIND, 
 			plot.path=".", plot.prefix="", asPDF=FALSE, 
-			showGrowth=NULL, showPvalue=NULL) {
+			showGrowth=NULL, showPvalue=NULL, normalized=FALSE) {
 
 	checkX11( bg="white", width=10, height=7)
 	par( mai=c( 1,1,0.8,0.4))
@@ -1325,10 +1417,12 @@ plotOneGene.TRIP <- function( gene, dfsIND, dfsUNIND, modelsIND, modelsUNIND,
 	ylim <- range( allValues, na.rm=TRUE)
 	ylim[2] <- ylim[2] + diff(ylim)*0.35
 	if ( ylim[1] > 0) ylim[1] <- ylim[1] * 0.9
+	yLabel <- "Abundance   Log2(RPMHEG)"
+	if (normalized) yLabel <- "Abundance   Log2(Normalized RPMHEG)"
 
 	mainText <- paste( "Mutant TRIP Timecourse:    ", plot.prefix, "\n", gene, " -  ", gene2Product(gene))
 	plot( 1, 1, type='n', main=mainText, xlim=xlim, ylim=ylim, xlab="Time  (days)", xaxt='n',
-			ylab="Abundance   Log2(RPMHEG)", font.axis=2, font.lab=2)
+			ylab=yLabel, font.axis=2, font.lab=2)
 	axis( side=1, at=sort( unique( allDays)), font=2)
 
 
@@ -1397,7 +1491,8 @@ plotOneGene.TRIP <- function( gene, dfsIND, dfsUNIND, modelsIND, modelsUNIND,
 # top level function to model the growth defects and make plots and growth defect summarys 
 # for all experiments in one sample key file
 model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
-				sharedDayZero=NULL, makePlots=TRUE, experiment=NULL) {
+				sharedDayZero=NULL, makePlots=TRUE, experiment=NULL,
+				normalized=FALSE) {
 
 	# load that sample key
 	allSamples <- loadSampleKeyFile( sampleKeyFile)
@@ -1423,8 +1518,10 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 		# get the final results table for experiment
 		myExperiment <- samples$Experiment[1]
 		cat( "\nModelling TRIP growth defects for experiment: ", myExperiment)
+		cat( "\n  Normalization Mode:  ", normalized)
 
 		resultsFileIn <- paste( "FinalResults", myExperiment, "txt", sep=".")
+		if (normalized) resultsFileIn <- paste( "Normalized.FinalResults", myExperiment, "txt", sep=".")
 		resultsFileIn <- file.path( results.path, resultsFileIn)
 		if ( ! file.exists( resultsFileIn)) {
 			cat( "\nResults file not found:  ", resultsFileIn)
@@ -1436,6 +1533,7 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 
 		# create folder for growth defect plots
 		plot.path <- file.path( results.path, paste( "TRIP.GrowthDecayPlots", myExperiment, sep="."))
+		if (normalized) plot.path <- file.path( results.path, paste( "TRIP.Normalized.GrowthDecayPlots", myExperiment, sep="."))
 		if ( ! file.exists( plot.path)) dir.create( plot.path, recursive=TRUE)
 
 		# default behavior is to process each sub class separately, and merge them all back together
@@ -1490,7 +1588,7 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 
 			# call the modeler
 			ans <- model.TRIP.GrowthDefects(smlTbl, makePlots=makePlots, plot.path=plot.path,
-						plot.prefix=desc, asPDF=TRUE)
+						plot.prefix=desc, asPDF=TRUE, normalized=normalized)
 			saveModelAns <<- ans
 
 			# we get back matrices of Rate and Pvalues, linearize them
@@ -1529,6 +1627,7 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 		rownames(out) <- 1:nrow(out)
 
 		resultsFileOut <- paste( "TRIP.GrowthDefect", myExperiment, "txt", sep=".")
+		if (normalized) resultsFileOut <- paste( "TRIP.Normalized.GrowthDefect", myExperiment, "txt", sep=".")
 		resultsFileOut <- file.path( results.path, resultsFileOut)
 		write.table( out, resultsFileOut, sep="\t", quote=F, row.names=F)
 
@@ -1537,7 +1636,9 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 		if ( all( out$SubClass1 == "")) out <- out[ , -match("SubClass1",colnames(out))]
 		htmlFile <- sub( "txt$", "html", resultsFileOut)
 		colnames(out) <- sub( "_", " ", colnames(out))
-		table2html( out, htmlFile, title=paste( "TRIP Growth Defect Results:   ", myExperiment),
+		myTitle <- "TRIP Growth Defect Results:   "
+		if ( normalized) myTitle <- "TRIP Normalized Growth Defect Results:   "
+		table2html( out, htmlFile, title=paste( myTitle, myExperiment),
 			linkColumnNames="PlotID", linkPaths=basename(plot.path), linkExtensions=".pdf")
 
 	})  ## done with tapply() of all experiments in the run

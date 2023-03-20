@@ -11,7 +11,7 @@ source( file.path( TRIP.PATH, "mutantAligner.R"))
 multicore.setup(4)
 
 # run the full pipeline:  aligning;  resolving mate pairs;  pie charts;  then lastly model the growth defects
-do.all( "SampleKey.Example.txt", sharedDayZero="NoDrug")
+do.all( "SampleKey.Example.txt", sharedDayZero="NoDrug", doMODEL=FALSE)
 
 # the above almost always fails a few times as all issues get fixed.
 # Once it works, you will get a plot of QC overview called "AlignmentSuccessOverview.pdf" that shows number of
@@ -21,5 +21,6 @@ do.all( "SampleKey.Example.txt", sharedDayZero="NoDrug")
 
 # Once all looks good, do the final modeling
 model.All.TRIP.Samples( "SampleKey.Example.txt", sharedDayZero="NoDrug")
+model.All.TRIP.Samples( "SampleKey.Example.txt", sharedDayZero="NoDrug", normalized=TRUE)
 
 # all final result files (both .TXT and .HTML) will be in the "Results/Example/" subfolder
