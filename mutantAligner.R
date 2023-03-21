@@ -249,6 +249,13 @@ mutantAlign <- function( sid, file1, file2, fastqPath=".", doBowtie=TRUE,
 	outfile1 <- file.path( bamPath, paste( sid, 1, "bam", sep="."))
 	outfile2 <- file.path( bamPath, paste( sid, 2, "bam", sep="."))
 
+	# allow if the pair file results already exist, to let us skip doing the alignments
+	pairPath <- file.path( results.path, "PAIR.Files")
+	pairFile <- file.path( pairPath, paste( sid, "ReadPairs.rda", sep="."))
+	if ( ! doBowtie && file.exists( pairFile)) {
+		cat( "\nSkipping Alignment step.  PAIR file already exist for: ", sid)
+		return()
+	}
 	if ( ! doBowtie && all( file.exists( c( outfile1, outfile2)))) {
 		cat( "\nSkipping Alignment step.  BAM files already exist for: ", sid)
 		return()
@@ -514,7 +521,7 @@ tabulateMutantAlignments.TRIP <- function( sid, results.path=".", makePie=TRUE, 
 		}
 
 	} else {
-		cat( "\nSkip..  Read Pair results exist already: ", sid)
+		cat( "\nSkipping Pair Tabulation step.  PAIR file already exists for: ", sid)
 	}
 }
 
