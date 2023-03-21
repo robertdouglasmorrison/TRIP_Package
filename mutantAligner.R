@@ -47,7 +47,7 @@ MAX_RAW_READS <- 2000000
 
 # crop low abunance values for math stability.  Samples below this threshold excluded from modelling.
 # RPMHEG = Reads Per Million per Hundred Expected Genes  (i.e number of mutants in the pool)
-MIN_LOG2_RPMHEG <- 3
+MIN_LOG2_RPMHEG <- 2
 MIN_READ_PAIRS <- 20000
 
 checkX11( bg="white", width=10, height=7)
@@ -803,7 +803,7 @@ writeResultTables <- function( tbl, samples, results.path, nExpectedGenes, poolG
 
 
 normalizeByUninduced <- function( tbl, samples, nExpectedGenes=rep.int( 100, ncol(tbl)),
-				max.scale.factor=1024) {
+				max.scale.factor=128) {
 
 	# given a matrix of RPMHEG normalized read count data, apply a second round of normalization,
 	# meant to compensate for how some mutant poolss may expand or contract overtime, separate from
@@ -811,32 +811,42 @@ normalizeByUninduced <- function( tbl, samples, nExpectedGenes=rep.int( 100, nco
 	# UnInduced samples, so Induction effect is less impacted by overall trends
 	
 	if ( ! all( colnames(tbl) == samples$SampleID)) stop( "Sample vs matrix sizing or naming error!")
+	SAV_SAM <<- samples
 	NC <- ncol(tbl)
 	
-	# know the induction status for every sample
-	isInduced <- samples$ATc_Induced
-	useForNorm <- which( isInduced == FALSE)
-
-	# build a sample key of all facts except induction.  We process one experiment at a time, so that fact not in the key
-	sKey <- paste( samples$Day, samples$Class, samples$SubClasss1, samples$SubClasss2, samples$MutantPool, sep="::")
-	sKeyFac <- factor(sKey)
-	sKeyPtrs <- tapply( 1:NC, sKeyFac, FUN=NULL)
+	# all shared day zero samples are always in every group, and always treated like uninduced
+	dayZeroSet <- which( samples$Day %in% DAY_ZERO)
 	
+	# know the induction status for every sample
+	isInduced <- as.logical(samples$ATc_Induced)
+	useForNorm <- which( ! isInduced)
+
+	# build a set of sample keys of various facts except induction.  We process one experiment at a time, so that fact not in the key
+	sDayKey <- paste( samples$Day, samples$Class, samples$SubClass1, samples$SubClass2, sep="::")
+	sDayKeyFac <- factor(sDayKey)
+	sDayKeyPtrs <- tapply( 1:NC, sDayKeyFac, FUN=NULL)
+		
 	out <- tbl
 	min.scale.factor <- 1 / max.scale.factor
+	min.value <- 2 ^ MIN_LOG2_RPMHEG
 	for ( i in 1:nrow(tbl)) {
 		vIn <- tbl[ i, ]
-		# now give each sample the mean scale factor from it's set of uninduced matched sample
+		# now give each sample the correct scale factor from it's set of uninduced matched sample
 		allScaleFac <- rep.int(1, NC)
 		for ( k in 1:NC) {
-			mySet <- which( sKeyPtrs == sKeyPtrs[k])
-			myUnindPtrs <- intersect( mySet, useForNorm)
-			if ( length(myUnindPtrs)) {
-				# use all uninduced to pick a central target
-				globalAvg <- sqrtmean( vIn[useForNorm], na.rm=T)
-				if (globalAvg < 1) globalAvg <- 1
-				# then use only the subset from this subset's uninduced to make the scale term
-				scaleFac <- median( globalAvg / vIn[myUnindPtrs], na.rm=T)
+			# since the uninduced are shared by all grouping, never try to adjust them
+			if ( k %in% dayZeroSet) next
+			# when it's a day zero column, expand its group...
+			myDaySet <-  which( sDayKeyPtrs == sDayKeyPtrs[k])
+			myUnindDayPtrs <- intersect( myDaySet, useForNorm)
+			# lastly, only use those with data
+			myUnindDayPtrs <- intersect( myUnindDayPtrs, which(vIn >= min.value))
+			if ( length(myUnindDayPtrs)) {
+				# use avg of all day zero to pick a central target level for all uninduced
+				globalAvg <- sqrtmean( vIn[dayZeroSet], na.rm=T)
+				if (globalAvg < min.value) next
+				# then use only the subset from this day subset's uninduced to make the scale term for this sample
+				scaleFac <- globalAvg / sqrtmean(vIn[myUnindDayPtrs], na.rm=T)
 				scaleFac[ is.na(scaleFac)] <- 1
 				scaleFac[ is.nan(scaleFac)] <- 1
 				scaleFac[ scaleFac > max.scale.factor] <- max.scale.factor
@@ -1275,6 +1285,7 @@ model.TRIP.GrowthDefects <- function( tbl, min.value=MIN_LOG2_RPMHEG, makePlots=
 			colnames(smlIND) <- colnames(smlUNIND) <- c( "Value", wantColumns[2:length(wantColumns)])
 
 			# values below a threshold are not real -- set to NA
+			# No- don't remove, just use as clipping threshold for more robust model
 			smlIND$Value[ smlIND$Value < min.value] <- NA
 			smlUNIND$Value[ smlUNIND$Value < min.value] <- NA
 
