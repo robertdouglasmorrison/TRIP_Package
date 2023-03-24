@@ -851,6 +851,10 @@ normalizeByUninduced <- function( tbl, samples, nExpectedGenes=rep.int( 100, nco
 			if ( length(myUnindDayPtrs)) {
 				# use avg of all day zero to pick a central target level for all uninduced
 				globalAvg <- sqrtmean( vIn[dayZeroSet], na.rm=T)
+				if (is.na(globalAvg)) {
+					cat( "\nWarning: no day zero samples found for normalizing against..")
+					next
+				}
 				if (globalAvg < min.value) next
 				# then use only the subset from this day subset's uninduced to make the scale term for this sample
 				scaleFac <- globalAvg / sqrtmean(vIn[myUnindDayPtrs], na.rm=T)
