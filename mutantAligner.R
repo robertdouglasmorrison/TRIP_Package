@@ -1521,7 +1521,7 @@ plotOneGene.TRIP <- function( gene, dfsIND, dfsUNIND, modelsIND, modelsUNIND,
 # for all experiments in one sample key file
 model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 				sharedDayZero=NULL, makePlots=TRUE, experiment=NULL,
-				normalized=FALSE) {
+				normalized=FALSE, dayZeroDays=NULL) {
 
 	# load that sample key
 	allSamples <- loadSampleKeyFile( sampleKeyFile)
@@ -1535,6 +1535,9 @@ model.All.TRIP.Samples <- function( sampleKeyFile="SampleKey.LogTRIP.txt",
 
 	# the 'Run Name' is extracted from the name of the Samples Key filename for the results folder name
 	results.path <- createResultsFolder( sampleKeyFile)
+
+	# allow user to redefine what day zero is
+	if ( ! is.null( dayZeroDays)) DAY_ZERO <<- dayZeroDays
 
 	# let's allow more than one 'Experiment' per Sample Key file
 	expFactor <- factor( allSamples$Experiment)
