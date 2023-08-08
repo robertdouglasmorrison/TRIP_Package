@@ -40,6 +40,7 @@ MetaDataColumns <- SampleKeyColumns[ 1:9]
 ModelMetaDataColumns <- c( MetaDataColumns, "Run", "ReadCount")
 
 # fix what day numbers will be used as the baseline timepoint for modeling growth defects over time.
+# as of Aug 2023, allow called functions to override what is DAY_ZERO
 DAY_ZERO <- c( 0, 1)
 
 # allow setting a maximum number of raw reads to align per sample
@@ -86,7 +87,7 @@ par( mai=c(0.6,0.4,0.6, 0.4))
 do.all <- function( sampleKeyFile, doBowtie=FALSE, dropZeroGenes=TRUE, 
 				verbose=FALSE, experiment=NULL, doAlignStats=doBowtie, doPairs=FALSE, 
 				makePies=FALSE, makeROC=FALSE, doMODEL=TRUE, sharedDayZero=NULL,
-				trim5=0, trim3=0, max.reads=MAX_RAW_READS) {
+				trim5=0, trim3=0, max.reads=MAX_RAW_READS, dayZeroDays=NULL) {
 	
 	# set the needed Genome & Target index for TRIP
 	BowtieIndex <<- TRIP.BowtieIndex
@@ -118,6 +119,9 @@ do.all <- function( sampleKeyFile, doBowtie=FALSE, dropZeroGenes=TRUE,
 	rownames(outStats) <<- allSamples$SampleID
 	colnames(outStats) <<- c( "StartingReads", "ValidMate1", "Pct_ValidMate1", "ValidMate2", 
 				"Pct_ValidMate2", "ValidPairs", "Pct_ValidPairs", "N_Genes")
+
+	# allow user to redefine what day zero is
+	if ( ! is.null( dayZeroDays)) DAY_ZERO <<- dayZeroDays
 
 	# allow more than one 'Experiment' per Sample Key file, and process each one separately
 	expFactor <- factor( allSamples$Experiment)
@@ -220,8 +224,8 @@ do.all <- function( sampleKeyFile, doBowtie=FALSE, dropZeroGenes=TRUE,
 
 	# when we are all done, try to run the growth defect code as a last step
 	if ( doMODEL) {
-		model.All.TRIP.Samples( sampleKeyFile, sharedDayZero=sharedDayZero, experiment=experiment, normalized=FALSE)
-		model.All.TRIP.Samples( sampleKeyFile, sharedDayZero=sharedDayZero, experiment=experiment, normalized=TRUE)
+		model.All.TRIP.Samples( sampleKeyFile, sharedDayZero=sharedDayZero, experiment=experiment, normalized=FALSE, dayZeroDays=dayZeroDays)
+		model.All.TRIP.Samples( sampleKeyFile, sharedDayZero=sharedDayZero, experiment=experiment, normalized=TRUE, dayZeroDays=dayZeroDays)
 	}
 	
 	cat( "\nDone.\n")
@@ -1210,7 +1214,7 @@ createClassDescriptor <- function( tbl) {
 
 model.TRIP.GrowthDefects <- function( tbl, min.value=MIN_LOG2_RPMHEG, makePlots=FALSE, 
 					plot.path=".", plot.prefix=NULL, asPDF=makePlots,
-					normalized=FALSE) {
+					normalized=FALSE, dayZeroDays=NULL) {
 
 	# given a data frame of final results (large table with columns of meta data & Mutant gene log2RPMHEG data)
 	# calculate all growth defects from 'Induced' vs 'Uninduced'
@@ -1224,10 +1228,13 @@ model.TRIP.GrowthDefects <- function( tbl, min.value=MIN_LOG2_RPMHEG, makePlots=
 	# for debugging
 	saveModelInput <<- tbl
 
+	# allow user to redefine what day zero is
+	if ( ! is.null( dayZeroDays)) DAY_ZERO <<- dayZeroDays
+
 	# make sure we have both Induced and Uninduced rows
-	inducedRows <- which( tbl$ATc_Induced)
+	inducedRows <- which( as.logical( tbl$ATc_Induced))
 	if ( ! length(inducedRows)) stop( "No Induced samples in this model. Can't run LM...")
-	uninducedRows <- which( ! tbl$ATc_Induced)
+	uninducedRows <- which( ! as.logical( tbl$ATc_Induced))
 	if ( ! length(uninducedRows)) stop( "No Uninduced samples in this model. Can't run LM...")
 	
 	# we will run the same model against each gene column, after dropping out any meta data columns
